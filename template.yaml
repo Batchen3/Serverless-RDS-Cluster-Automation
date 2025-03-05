@@ -4,6 +4,53 @@ Description: |
   "RDS request AWS services"
 
 Resources:
+
+  ApiSnsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: sns-publish-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: !Ref SnsTopicRdsRequest
+  
+  ApiRdsRequest:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      DefinitionBody:
+        openapi: 3.0.1
+        info:
+          title: API RDS request
+          version: 1.0.0
+        paths:
+          /provision:
+            post:
+              responses:
+                '200':
+                  description: Successful notification
+              x-amazon-apigateway-integration:
+                type: aws
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:sns:action/Publish
+                httpMethod: POST
+                credentials: !GetAtt ApiSnsRole.Arn
+                requestTemplates:
+                  application/json: |
+                    Action=Publish&TopicArn=$util.urlEncode('${SnsTopicRdsRequest}')&Message=$util.base64Encode($input.body)
+                responses:
+                  default:
+                    statusCode: 200
+
   SnsTopicRdsRequest:
     Type: AWS::SNS::Topic
     Properties:
@@ -46,48 +93,74 @@ Resources:
     CodeUri: scripts/
     Handler: handler.lambda_handler
     Runtime: python3.11
+    Role: !GetAtt LambdaExecutionRole.Arn
     Environment:
         Variables:
-          GITHUB_TOKEN_SECRET_NAME: "my-github-secret"
-          GITHUB_REPO: "my-org/my-repo"
-          QUEUE_URL: !Ref SqsQueueRdsRequest
+          GITHUB_TOKEN_SECRET_NAME: "github-secret"
+          GITHUB_REPO: "Batchen3/Serverless-RDS-Cluster-Automation"
     Events:
       SqsTrigger:
         Type: SQS
         Properties:
           Queue: !GetAtt SqsQueueRdsRequest.Arn
 
-  # LambdaExecutionRole:     Role: !GetAtt LambdaExecutionRole.Arn
-  #   Type: AWS::IAM::Role
-  #   Properties:
-  #     RoleName: "LambdaRDSExecutionRole"
-  #     AssumeRolePolicyDocument:
-  #       Version: "2012-10-17"
-  #       Statement:
-  #         - Effect: Allow
-  #           Principal:
-  #             Service: 
-  #               - lambda.amazonaws.com
-  #           Action: 
-  #             - sts:AssumeRole
-  #     Policies:
-  #       - PolicyName: "LambdaPolicy"
-  #         PolicyDocument:
-  #           Version: "2012-10-17"
-  #           Statement:
-  #             - Effect: Allow
-  #               Action:
-  #                 - sqs:ReceiveMessage
-  #                 - sqs:DeleteMessage
-  #                 - sqs:GetQueueAttributes
-  #               Resource: !GetAtt MySQSQueue.Arn
-  #             - Effect: Allow
-  #               Action:
-  #                 - secretsmanager:GetSecretValue
-  #               Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:my-github-secret-*"
-  #             - Effect: Allow
-  #               Action:
-  #                 - logs:CreateLogGroup
-  #                 - logs:CreateLogStream
-  #                 - logs:PutLogEvents
-  #               Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/RDSProvisioningLambda:*"
+  LambdaExecutionRole:     
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: "LambdaRDSExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - lambda.amazonaws.com
+            Action: 
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: "LambdaPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt SqsQueueRdsRequest.Arn
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:github-secret"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/rds-request:*"
+
+
+  ApiDomainName:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      DomainName: api.rdsrequest.com
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  ApiBasePathMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    Properties:
+      DomainName: !Ref ApiDomainName
+      RestApiId: !Ref ApiRdsRequest
+      Stage: prod
+
+Outputs:
+
+  CustomDomainEndpoint:
+    Description: Custom Domain URL
+    Value: "https://api.rdsrequest.com/send"
+
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${SimpleApi}.execute-api.${AWS::Region}.amazonaws.com/prod/send"
