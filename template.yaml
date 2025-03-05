@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: |
+  "RDS request AWS services"
+
+Resources:
+  SnsTopicRdsRequest:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: rds-request
+      Subscription:
+        - Protocol: sqs
+          Endpoint: !GetAtt SqsQueueRdsRequest.Arn
+      Tags:
+        - Key: Name
+          Value: rds-request
+
+  SqsQueueRdsRequest:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: rds-request
+      Tags:
+        - Key: Name
+          Value: rds-request
+
+  SqsQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref SqsQueueRdsRequest
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action: 
+              - "sqs:SendMessage"
+            Resource: !GetAtt SqsQueueRdsRequest.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref SnsTopicRdsRequest
+
+  LambdaRdsRequest:
+  Type: AWS::Serverless::Function
+  Properties:
+    FunctionName: rds-request
+    CodeUri: scripts/
+    Handler: handler.lambda_handler
+    Runtime: python3.11
+    Environment:
+        Variables:
+          GITHUB_TOKEN_SECRET_NAME: "my-github-secret"
+          GITHUB_REPO: "my-org/my-repo"
+          QUEUE_URL: !Ref SqsQueueRdsRequest
+    Events:
+      SqsTrigger:
+        Type: SQS
+        Properties:
+          Queue: !GetAtt SqsQueueRdsRequest.Arn
+
+  # LambdaExecutionRole:     Role: !GetAtt LambdaExecutionRole.Arn
+  #   Type: AWS::IAM::Role
+  #   Properties:
+  #     RoleName: "LambdaRDSExecutionRole"
+  #     AssumeRolePolicyDocument:
+  #       Version: "2012-10-17"
+  #       Statement:
+  #         - Effect: Allow
+  #           Principal:
+  #             Service: 
+  #               - lambda.amazonaws.com
+  #           Action: 
+  #             - sts:AssumeRole
+  #     Policies:
+  #       - PolicyName: "LambdaPolicy"
+  #         PolicyDocument:
+  #           Version: "2012-10-17"
+  #           Statement:
+  #             - Effect: Allow
+  #               Action:
+  #                 - sqs:ReceiveMessage
+  #                 - sqs:DeleteMessage
+  #                 - sqs:GetQueueAttributes
+  #               Resource: !GetAtt MySQSQueue.Arn
+  #             - Effect: Allow
+  #               Action:
+  #                 - secretsmanager:GetSecretValue
+  #               Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:my-github-secret-*"
+  #             - Effect: Allow
+  #               Action:
+  #                 - logs:CreateLogGroup
+  #                 - logs:CreateLogStream
+  #                 - logs:PutLogEvents
+  #               Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/RDSProvisioningLambda:*"
