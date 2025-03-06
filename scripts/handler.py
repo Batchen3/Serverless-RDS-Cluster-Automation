@@ -20,29 +20,16 @@ def get_github_token():
     secret = json.loads(response['SecretString'])
     return secret.get('GITHUB_TOKEN')
 
-def generate_variables_tf(db_name, db_engine, instance_type):
- logger.info(f"Generating variables.tf content for {db_name} ({db_engine}) with {instance_type}")
- return f"""
-    variable "db_instance_identifier" {{
-      description = "The name of the RDS instance"
-      type        = string
-      default     = "{db_name}"
-    }}
 
-    variable "db_engine" {{
-      description = "The database engine to use"
-      type        = string
-      default     = "{db_engine}"
-    }}
-
-    variable "db_instance_class" {{
-      description = "The instance class for the RDS instance"
-      type        = string
-      default     = "{instance_type}"
-    }}
+def generate_terraform_tfvars(db_name, db_engine, instance_type):
+    logger.info("Generating terraform.tfvars content for RDS configuration")
+    return f"""
+    db_instance_identifier = "{db_name}"
+    db_engine             = "{db_engine}"
+    db_instance_class     = "{instance_type}"
     """
 
-def create_github_pr(terraform_variables):
+def create_github_pr(terraform_configuration):
     github_token = get_github_token()
     g = Github(github_token)
     repo = g.get_repo(GITHUB_REPO)
@@ -56,18 +43,22 @@ def create_github_pr(terraform_variables):
         pass
     
     logger.info("Fetching main branch reference")
-    main_ref = repo.get_git_ref("heads/main")
+    rds_deployment_ref = repo.get_git_ref("heads/rdsDeployment")
     if not branch_exists:
         logger.info(f"Creating branch: {BRANCH_NAME}")
-        repo.create_git_ref(ref=f"refs/heads/{BRANCH_NAME}", sha=main_ref.object.sha)
+        repo.create_git_ref(ref=f"refs/heads/{BRANCH_NAME}", sha=rds_deployment_ref.object.sha)
     
-    file_path = "terraform/variables.tf"
-    existing_file = repo.get_contents(file_path, ref=BRANCH_NAME)
-    logger.info(f"Updating existing Terraform file: {file_path}")
-    repo.update_file(file_path, "Updating variables.tf", terraform_variables, existing_file.sha, branch=BRANCH_NAME)    
-    
+    file_path = "terraform/terraform.tfvars"
+
+    try:
+        existing_file = repo.get_contents(file_path, ref=BRANCH_NAME)
+        logger.info(f"Updating existing Terraform file: {file_path}")
+        repo.update_file(file_path, "Updating terraform.tfvars", terraform_configuration, existing_file.sha, branch=BRANCH_NAME)    
+    except:
+        repo.create_file(file_path, "Adding terraform.tfvars", terraform_configuration, branch=BRANCH_NAME)
+        
     logger.info("Creating GitHub PR")
-    repo.create_pull(title="Provision RDS Cluster", body="This PR adds variables for RDS cluster", head=BRANCH_NAME, base="main")
+    repo.create_pull(title="Provision RDS Cluster", body="This PR sets configuration for RDS cluster", head=BRANCH_NAME, base="rdsDeployment")
 
 def lambda_handler(event, context):
     logger.info(f"Received event: {json.dumps(event)}")
@@ -80,8 +71,8 @@ def lambda_handler(event, context):
         instance_type = "db.t3.micro" if environment == "Dev" else "db.t3.medium"
 
         logger.info(f"Processing RDS request: {db_name}, {db_engine}, {environment}")
-        terraform_variables = generate_variables_tf(db_name, db_engine, instance_type)
-        create_github_pr(terraform_variables)
+        terraform_configuration = generate_terraform_tfvars(db_name, db_engine, instance_type)
+        create_github_pr(terraform_configuration)
     
     logger.info("Successfully processed all records")
     return {

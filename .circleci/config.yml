@@ -1,2 +1,54 @@
 version: 2.1
 
+executors:
+  aws-executor:
+    docker:
+      - image: amazon/aws-cli:2.24.17
+  
+  terraform-executor:
+    docker:
+      - image: hashicorp/terraform:1.11.1
+
+jobs:
+  deploy-serverless:
+    executor: aws-executor
+    steps:
+      - checkout
+      - run:
+          name: Install AWS SAM CLI
+          command: |
+            curl -Lo sam-installation.zip https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-x86_64.zip
+            unzip sam-installation.zip -d sam-installation
+            sudo ./sam-installation/install
+      - run:
+          name: Deploy AWS SAM Stack
+          command: |
+            sam build
+            sam deploy --stack-name rds-request-services --resolve-s3 --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM --no-confirm-changeset --no-fail-on-empty-changeset
+
+  apply-terraform:
+    executor: terraform-executor
+    steps:
+      - checkout
+      - run:
+          name: Initialize Terraform
+          command: |
+            cd terraform 
+            terraform init
+      - run:
+          name: Apply Terraform Changes
+          command: |
+            terraform apply -auto-approve
+
+workflows:
+  version: 2
+  pipeline:
+    jobs:
+      - deploy-serverless:
+          filters:
+            branches:
+              only: main
+      - apply-terraform:
+          filters:
+            branches:
+              only: rdsDeployment
