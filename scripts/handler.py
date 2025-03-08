@@ -7,7 +7,8 @@ from github import Github
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-sqs = boto3.client('sqs')
+# sqs = boto3.client('sqs')
+
 secrets_manager = boto3.client('secretsmanager')
 
 GITHUB_TOKEN_SECRET_NAME = os.getenv('GITHUB_TOKEN_SECRET_NAME')
@@ -18,7 +19,7 @@ def get_github_token():
     logger.info("Fetching GitHub token from Secrets Manager")
     response = secrets_manager.get_secret_value(SecretId=GITHUB_TOKEN_SECRET_NAME)
     secret = json.loads(response['SecretString'])
-    return secret.get('GITHUB_TOKEN')
+    return secret.get('github-token')
 
 
 def generate_terraform_tfvars(db_name, db_engine, instance_type):
@@ -42,7 +43,7 @@ def create_github_pr(terraform_configuration):
     except:
         pass
     
-    logger.info("Fetching main branch reference")
+    logger.info("Fetching rdsDeployment branch reference")
     rds_deployment_ref = repo.get_git_ref("heads/rdsDeployment")
     if not branch_exists:
         logger.info(f"Creating branch: {BRANCH_NAME}")
@@ -65,9 +66,9 @@ def lambda_handler(event, context):
 
     for record in event['Records']:
         message = json.loads(record['body'])
-        db_name = message['DatabaseName']
-        db_engine = message['DatabaseEngine']
-        environment = message['Environment']
+        db_name = message['databaseName']
+        db_engine = message['databaseEngine']
+        environment = message['environment']
         instance_type = "db.t3.micro" if environment == "Dev" else "db.t3.medium"
 
         logger.info(f"Processing RDS request: {db_name}, {db_engine}, {environment}")

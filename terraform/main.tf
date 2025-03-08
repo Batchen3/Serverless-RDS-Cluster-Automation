@@ -11,20 +11,20 @@ provider "aws" {
   region = "us-east-1"
 }
 
-data "aws_ssm_parameter" "rds_username" {
-  name = "/rds/username"
+data "aws_secretsmanager_secret" "rds_secret" {
+  name = "rds-credentials"
 }
 
-data "aws_ssm_parameter" "rds_password" {
-  name = "/rds/password"
+data "aws_secretsmanager_secret_version" "rds_secret_version" {
+  secret_id = data.aws_secretsmanager_secret.rds_secret.id
 }
 
 resource "aws_db_instance" "default" {
   allocated_storage = 10
-  identifier = var.db_instance_identifier
+  identifier          = var.db_instance_identifier
   engine              = var.db_engine
   instance_class      = var.db_instance_class
-  username           = data.aws_ssm_parameter.rds_username.value
-  password           = data.aws_ssm_parameter.rds_password.value
+  username           = jsondecode(data.aws_secretsmanager_secret_version.rds_secret_version.secret_string)["username"]
+  password           = jsondecode(data.aws_secretsmanager_secret_version.rds_secret_version.secret_string)["password"]
   skip_final_snapshot = true
 }

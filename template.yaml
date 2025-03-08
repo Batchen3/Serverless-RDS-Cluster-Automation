@@ -139,7 +139,6 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/rds-request:*"
 
-
   ApiDomainName:
     Type: AWS::ApiGateway::DomainName
     Properties:
@@ -159,8 +158,4 @@ Outputs:
 
   CustomDomainEndpoint:
     Description: Custom Domain URL
-    Value: "https://api.rdsrequest.com/send"
-
-  ApiEndpoint:
-    Description: API Gateway endpoint URL
-    Value: !Sub "https://${SimpleApi}.execute-api.${AWS::Region}.amazonaws.com/prod/send"
+    Value: "https://api.rdsrequest.com/provision"

@@ -4,10 +4,18 @@ executors:
   aws-executor:
     docker:
       - image: amazon/aws-cli:2.24.17
+        environment:
+          AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+          AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+          AWS_REGION: $AWS_REGION
   
   terraform-executor:
     docker:
       - image: hashicorp/terraform:1.11.1
+        environment: 
+          AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+          AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+          AWS_REGION: $AWS_REGION
 
 jobs:
   deploy-serverless:
