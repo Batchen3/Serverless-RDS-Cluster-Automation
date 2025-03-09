@@ -7,7 +7,6 @@ The developer sends a POST API request to https://api.rdsrequest.com/provision w
 - Database name
 - Database engine (MySQL, PostgreSQL)
 - Database environment (Dev/Prod)
-For example:
 ```json
 {
   "databaseName": "mydatabase",
@@ -41,7 +40,10 @@ What happens next?
     - AWS_SECRET_ACCESS_KEY: Your AWS secret access key.
     - AWS_REGION: The AWS region where you want to deploy the resources (e.g., us-east-1).
 
-When merging to main the AWS SAM is deployed with the serverless architecture (API Gateway, SNS, SQS, 
-and Lambda)
+Clone the repository to your local machine:
+```
+git clone https://github.com/Batchen3/Serverless-RDS-Cluster-Automation.git
+```
+Do some changes and merge your code to main, once merging to main the AWS SAM is deployed with the serverless architecture (API Gateway, SNS, SQS, and Lambda)
 
-That's it! Now you can provide RDS clusters for developers in automated way!!
+That's it! Now you can send RDS request and provide RDS clusters for developers in an automated way!!
