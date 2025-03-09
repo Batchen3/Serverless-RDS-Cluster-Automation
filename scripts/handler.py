@@ -7,8 +7,6 @@ from github import Github
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# sqs = boto3.client('sqs')
-
 secrets_manager = boto3.client('secretsmanager')
 
 GITHUB_TOKEN_SECRET_NAME = os.getenv('GITHUB_TOKEN_SECRET_NAME')
