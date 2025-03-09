@@ -44,6 +44,7 @@ Clone the repository to your local machine:
 ```
 git clone https://github.com/Batchen3/Serverless-RDS-Cluster-Automation.git
 ```
-Do some changes and merge your code to main, once merging to main the AWS SAM is deployed with the serverless architecture (API Gateway, SNS, SQS, and Lambda)
+To deploy the serverless architecture (API Gateway, SNS, SQS, and Lambda) merge changes to main.
+This will trigger a CircleCI pipeline which will deploy the infrastructure using SAM.
 
 That's it! Now you can send RDS request and provide RDS clusters for developers in an automated way!!
